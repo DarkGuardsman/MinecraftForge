@@ -19,9 +19,13 @@
 
 package net.minecraftforge.energy;
 
+import static net.minecraftforge.energy.EnergyActions.IGNORE_LIMITS;
+import static net.minecraftforge.energy.EnergyActions.MATCH_EXACT;
+import static net.minecraftforge.energy.EnergyActions.SIMULATE;
+
 /**
  * Reference implementation of {@link IEnergyStorage}. Use/extend this or implement your own.
- *
+ * <p>
  * Derived from the Redstone Flux power system designed by King Lemming and originally utilized in Thermal Expansion and related mods.
  * Created with consent and permission of King Lemming and Team CoFH. Released with permission under LGPL 2.1 when bundled with Forge.
  */
@@ -52,31 +56,107 @@ public class EnergyStorage implements IEnergyStorage
         this.capacity = capacity;
         this.maxReceive = maxReceive;
         this.maxExtract = maxExtract;
-        this.energy = Math.max(0 , Math.min(capacity, energy));
+        this.energy = Math.max(0, Math.min(capacity, energy));
     }
 
     @Override
-    public int receiveEnergy(int maxReceive, boolean simulate)
+    public int receiveEnergy(int maxReceive, FunctionEnergyAction actions)
     {
+        //Reject if we can't receive
         if (!canReceive())
+        {
             return 0;
+        }
 
-        int energyReceived = Math.min(capacity - energy, Math.min(this.maxReceive, maxReceive));
-        if (!simulate)
-            energy += energyReceived;
+        //Check for match exact
+        if (actions.apply(MATCH_EXACT))
+        {
+            //Enforce take all, not enough storage space
+            if (getEnergyStored() + maxReceive > getMaxEnergyStored())
+            {
+                return 0;
+            }
+            //Enforce take all, limit would prevent exact
+            else if (!actions.apply(IGNORE_LIMITS) && maxReceive > this.maxReceive)
+            {
+                return 0;
+            }
+        }
+
+        //Calculate receive
+        final int receiveLimit =  Math.min(actions.apply(IGNORE_LIMITS) ? capacity : this.maxReceive, maxReceive);
+        final int energyReceived = Math.min(capacity - energy, receiveLimit);
+
+        //Do action
+        if (!actions.apply(SIMULATE))
+        {
+            setEnergyStored(energy + energyReceived);
+        }
+
         return energyReceived;
     }
 
     @Override
-    public int extractEnergy(int maxExtract, boolean simulate)
+    public int extractEnergy(int maxExtract, FunctionEnergyAction actions)
     {
+        //Reject if we can't exact
         if (!canExtract())
+        {
             return 0;
+        }
 
-        int energyExtracted = Math.min(energy, Math.min(this.maxExtract, maxExtract));
-        if (!simulate)
-            energy -= energyExtracted;
+        //Check for match exact
+        if (actions.apply(MATCH_EXACT))
+        {
+            //Enforce take all, not enough energy
+            if (maxExtract > energy)
+            {
+                return 0;
+            }
+            //Enforce take all, limit would prevent exact
+            else if (!actions.apply(IGNORE_LIMITS) && maxExtract > this.maxExtract)
+            {
+                return 0;
+            }
+        }
+
+        //Calculate extract
+        final int extractLimit = Math.min(actions.apply(IGNORE_LIMITS) ? capacity : this.maxExtract, maxExtract);
+        final int energyExtracted = Math.min(energy, extractLimit);
+
+        //Do action
+        if (!actions.apply(SIMULATE))
+        {
+            setEnergyStored(energy - energyExtracted);
+        }
+
         return energyExtracted;
+    }
+
+    /**
+     * Allows setting the energy directly
+     *
+     * @param value - value to set
+     */
+    public void setEnergyStored(int value)
+    {
+        final int prevEnergy = this.energy;
+        this.energy = Math.max(0, Math.min(value, getMaxEnergyStored()));
+        if (prevEnergy != this.energy)
+        {
+            onEnergyChanged(prevEnergy, value);
+        }
+    }
+
+    /**
+     * Triggered any time the energy state changes.
+     *
+     * @param prevValue - value before changes were applied
+     * @param newValue  - new value after changes were applied
+     */
+    protected void onEnergyChanged(int prevValue, int newValue)
+    {
+        //Override this to implement update/sync logic
     }
 
     @Override

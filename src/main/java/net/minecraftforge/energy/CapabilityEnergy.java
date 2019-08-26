@@ -19,16 +19,22 @@
 
 package net.minecraftforge.energy;
 
-import java.util.concurrent.Callable;
-
 import net.minecraft.nbt.INBT;
 import net.minecraft.nbt.IntNBT;
 import net.minecraft.util.Direction;
-import net.minecraftforge.common.capabilities.*;
+import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.Capability.IStorage;
+import net.minecraftforge.common.capabilities.CapabilityInject;
+import net.minecraftforge.common.capabilities.CapabilityManager;
 
 public class CapabilityEnergy
 {
+    //Cached EnergyAction handler functions
+    public static final FunctionEnergyAction NORMAL = (value) -> false;
+    public static final FunctionEnergyAction SIMULATE = (value) -> value == EnergyActions.SIMULATE;
+    public static final FunctionEnergyAction IGNORE_LIMITS = (value) -> value == EnergyActions.IGNORE_LIMITS;
+    public static final FunctionEnergyAction MATCH_EXACT = (value) -> value == EnergyActions.MATCH_EXACT;
+
     @CapabilityInject(IEnergyStorage.class)
     public static Capability<IEnergyStorage> ENERGY = null;
 
